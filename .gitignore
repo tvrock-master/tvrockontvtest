@@ -1,0 +1,12 @@
+# Build and distribution output
+/target/
+/tvrockontvtest/
+
+# Local IDE settings
+/.vs/
+*.user
+*.suo
+
+# Runtime settings and logs (may contain local paths)
+*.ini
+*.log

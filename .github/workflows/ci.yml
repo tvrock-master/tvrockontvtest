@@ -1,0 +1,66 @@
+name: Tests and release
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: startsWith(github.ref, 'refs/heads/')
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test x64
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./test.ps1 -Architecture x64
+
+      - name: Test x86
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./test.ps1 -Architecture x86
+
+  build:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build and collect plugins
+        run: ./build-artifact.ps1
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: tvrockontvtest
+          path: tvrockontvtest/
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'tvrockontvtest.zip'
+          Compress-Archive -Path ./tvrockontvtest -DestinationPath $archive -Force
+
+          gh release view "$env:RELEASE_TAG" --json id --jq .id
+          if ($LASTEXITCODE -eq 0) {
+              gh release upload "$env:RELEASE_TAG" "$archive" --clobber
+          } else {
+              gh release create "$env:RELEASE_TAG" "$archive" --verify-tag --title "$env:RELEASE_TAG" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publication failed.' }

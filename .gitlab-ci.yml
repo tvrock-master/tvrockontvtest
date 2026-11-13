@@ -1,0 +1,34 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_PIPELINE_SOURCE == "push"'
+    - when: never
+
+stages:
+  - test
+  - build
+
+test:
+  stage: test
+  tags:
+    - saas-windows-medium-amd64
+  script:
+    - |
+      powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./test.ps1 -Architecture x64
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - |
+      powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./test.ps1 -Architecture x86
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+build:
+  stage: build
+  # GitLab.com hosted Windows runner. For self-managed runners, change this tag.
+  # Requires PowerShell, Visual Studio C++ Build Tools, and the Windows SDK.
+  tags:
+    - saas-windows-medium-amd64
+  script:
+    - ./build-artifact.ps1
+    - ./publish-gitlab-release.ps1
+  artifacts:
+    name: 'TvRockOnTVTest-$CI_COMMIT_TAG'
+    paths:
+      - tvrockontvtest/
